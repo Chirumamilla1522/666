@@ -1,0 +1,16 @@
+fastapi==0.110.0
+uvicorn==0.29.0
+sqlalchemy==2.0.28
+pandas==2.2.0
+yfinance==0.2.35
+scikit-learn==1.4.1
+textblob==0.17.1
+python-dotenv==1.0.1
+requests==2.31.0
+feedparser==6.0.10
+beautifulsoup4==4.12.3
+faiss-cpu==1.7.4
+sentence-transformers==2.3.1
+numpy==1.26.3
+scipy==1.12.0
+pydantic==2.6.3 

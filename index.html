@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockRadar Dashboard</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            padding-top: 5rem;
+            transition: background .3s, color .3s;
+        }
+
+        .chart-container {
+            width: 100%;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1055;
+        }
+
+        .dark-mode {
+            background: #121212;
+            color: #f0f0f0;
+        }
+
+        .dark-mode table {
+            color: #f0f0f0;
+        }
+
+        .dark-mode .table-dark {
+            background-color: #1f1f1f;
+        }
+
+        .filter-input {
+            max-width: 300px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">📊 StockRadar</a>
+            <div class="d-flex align-items-center">
+                <label class="form-check-label text-white me-2" for="themeToggle">Dark</label>
+                <input class="form-check-input me-4" type="checkbox" id="themeToggle">
+            </div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Toasts -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="container">
+
+        <!-- Portfolio Section -->
+        <section id="portfolio" class="my-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>1. Portfolio</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#holdingModal"
+                    onclick="openModal()">Add Holding</button>
+            </div>
+
+            <!-- Search -->
+            <input type="text" class="form-control filter-input mb-3" placeholder="Filter tickers..."
+                oninput="filterTable('portfolio-body', this.value)">
+
+            <!-- Bar Chart -->
+            <div class="chart-container mb-4">
+                <canvas id="portfolioChart"></canvas>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped" id="portfolio-table">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Qty</th>
+                            <th>Avg Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portfolio-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Recommendations Section -->
+        <section id="recommendations" class="my-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>2. Recommendations</h2>
+                <button class="btn btn-success" onclick="getRecs()">Refresh</button>
+            </div>
+            <input type="text" class="form-control filter-input mb-3" placeholder="Filter recs..."
+                oninput="filterTable('recs-body', this.value)">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="recs-table">
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Name</th>
+                            <th>Sector</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recs-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- News Impact Section -->
+        <section id="news-impact" class="my-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>3. News Impact</h2>
+                <button class="btn btn-warning" onclick="getNewsImpact()">Refresh</button>
+            </div>
+            <input type="text" class="form-control filter-input mb-3" placeholder="Filter news..."
+                oninput="filterTable('impact-body', this.value)">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="impact-table">
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Headline</th>
+                            <th>Sentiment</th>
+                            <th>ΔP</th>
+                            <th>Published</th>
+                        </tr>
+                    </thead>
+                    <tbody id="impact-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Holding Add/Edit Modal -->
+    <div class="modal fade" id="holdingModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="holdingForm" onsubmit="submitHolding(event)">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalTitle">Add Holding</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" title="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="modal-id">
+                        <div class="mb-3">
+                            <label class="form-label" for="modal-ticker">Ticker</label>
+                            <input type="text" id="modal-ticker" class="form-control" required aria-label="Stock Ticker Symbol" placeholder="e.g. AAPL">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="modal-qty">Quantity</label>
+                            <input type="number" id="modal-qty" class="form-control" required aria-label="Quantity of Shares" placeholder="Number of shares">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="modal-price">Avg Price</label>
+                            <input type="number" id="modal-price" class="form-control" required aria-label="Average Price per Share" placeholder="Price per share">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS bundle (with Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const API = location.origin;
+        let portfolioChart;
+        let isDark = false;
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('change', e => {
+            document.body.classList.toggle('dark-mode', e.target.checked);
+            isDark = e.target.checked;
+        });
+
+        // Toast helper
+        function showToast(msg, type = "info") {
+            const container = document.getElementById("toast-container");
+            const el = document.createElement("div");
+            el.className = `toast align-items-center text-bg-${type} border-0`;
+            el.setAttribute("role", "alert");
+            el.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">${msg}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>`;
+            container.append(el);
+            new bootstrap.Toast(el, { delay: 2500 }).show();
+        }
+
+        // Table filter
+        function filterTable(bodyId, query) {
+            const rows = document.getElementById(bodyId).children;
+            const q = query.toLowerCase();
+            for (let r of rows) {
+                r.style.display = r.textContent.toLowerCase().includes(q) ? "" : "none";
+            }
+        }
+
+        // Modal controls
+        const holdingModal = new bootstrap.Modal(document.getElementById("holdingModal"));
+        function openModal(h) {
+            document.getElementById("modal-id").value = h?.id || "";
+            document.getElementById("modal-ticker").value = h?.ticker || "";
+            document.getElementById("modal-qty").value = h?.quantity || "";
+            document.getElementById("modal-price").value = h?.avg_price || "";
+            document.getElementById("modalTitle").textContent = h ? "Edit Holding" : "Add Holding";
+            holdingModal.show();
+        }
+
+        async function submitHolding(evt) {
+            evt.preventDefault();
+            const id = document.getElementById("modal-id").value;
+            const payload = {
+                ticker: document.getElementById("modal-ticker").value.toUpperCase(),
+                quantity: +document.getElementById("modal-qty").value,
+                avg_price: +document.getElementById("modal-price").value
+            };
+            const method = id ? "PUT" : "POST";
+            const url = id ? `${API}/portfolio/${id}` : `${API}/portfolio`;
+            const res = await fetch(url, {
+                method, headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) return showToast(`Error ${res.status}`, "danger");
+            showToast(id ? "Updated!" : "Added!", "success");
+            holdingModal.hide();
+            listPortfolio(); getRecs(); getNewsImpact();
+        }
+
+        async function listPortfolio() {
+            const data = await (await fetch(`${API}/portfolio`)).json();
+            const rows = data.map(h => `
+        <tr>
+          <td>${h.ticker}</td><td>${h.quantity}</td>
+          <td>$${h.avg_price.toFixed(2)}</td>
+          <td>
+            <button class="btn btn-sm btn-light" onclick='openModal(${JSON.stringify(h)})' title="Edit ${h.ticker}" aria-label="Edit ${h.ticker}">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteHolding('${h.id}')" title="Delete ${h.ticker}" aria-label="Delete ${h.ticker}">🗑️</button>
+          </td>
+        </tr>` );
+            document.getElementById("portfolio-body").innerHTML = rows.join("");
+            updateChart(data);
+        }
+
+        async function deleteHolding(id) {
+            await fetch(`${API}/portfolio/${id}`, { method: "DELETE" });
+            showToast("Deleted", "warning");
+            listPortfolio(); getRecs(); getNewsImpact();
+        }
+
+        async function getRecs() {
+            const data = await (await fetch(`${API}/recommendations`)).json();
+            const rows = data.map(r => `
+        <tr><td>${r.ticker}</td><td>${r.name}</td>
+        <td>${r.sector}</td><td>${r.similarity_score}</td></tr>`);
+            document.getElementById("recs-body").innerHTML = rows.join("");
+        }
+
+        async function getNewsImpact() {
+            try {
+                const response = await fetch(`${API}/news-impact`);
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    const rows = data.map(n => `
+                <tr>
+                  <td>${n.ticker}</td>
+                  <td>${n.headline}</td>
+                  <td>${n.sentiment}</td>
+                  <td>${n.delta ? n.delta.toFixed(2) : '0.00'}</td>
+                  <td>${new Date(n.published).toLocaleString()}</td>
+                </tr>` );
+                    document.getElementById("impact-body").innerHTML = rows.join("");
+                } else {
+                    document.getElementById("impact-body").innerHTML = `
+                <tr>
+                  <td colspan="5" class="text-center">
+                    <div class="alert alert-info my-3">
+                      No news impact data found. Try adding stocks to your portfolio or refreshing.
+                    </div>
+                  </td>
+                </tr>`;
+                }
+            } catch (error) {
+                console.error("Error fetching news impact:", error);
+                document.getElementById("impact-body").innerHTML = `
+                <tr>
+                  <td colspan="5" class="text-center">
+                    <div class="alert alert-danger my-3">
+                      Error loading news impact data: ${error.message}
+                    </div>
+                  </td>
+                </tr>`;
+            }
+        }
+
+        // Chart.js horizontal bar
+        function updateChart(data) {
+            const ctx = document.getElementById("portfolioChart").getContext("2d");
+            const labels = data.map(h => h.ticker);
+            const values = data.map(h => h.quantity);
+            if (portfolioChart) {
+                portfolioChart.data.labels = labels;
+                portfolioChart.data.datasets[0].data = values;
+                portfolioChart.update();
+            } else {
+                portfolioChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Quantity', data: values }] },
+                    options: {
+                        indexAxis: 'y',
+                        scales: { x: { beginAtZero: true } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        // Initial load
+        listPortfolio(); getRecs(); getNewsImpact();
+    </script>
+</body>
+
+</html>

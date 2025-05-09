@@ -1,0 +1,30 @@
+{
+  "name": "stockradar",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@chakra-ui/icons": "^2.2.4",
+    "@chakra-ui/react": "^3.16.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^5.17.1",
+    "@mui/material": "^5.17.1",
+    "@mui/x-data-grid": "^6.6.0",
+    "axios": "^1.5.0",
+    "bs4": "^0.0.1",
+    "chart.js": "^4.3.0",
+    "fastapi": "^0.0.8",
+    "framer-motion": "^12.8.0",
+    "pandas": "^0.0.3",
+    "python-dotenv": "^0.1.0",
+    "recharts": "^2.6.2",
+    "scikit-learn": "^0.1.0",
+    "textblob": "^0.5.0",
+    "yfinance": "^0.2.33"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "start-ui": "cd stockradar-ui && npm start",
+    "build-ui": "cd stockradar-ui && npm run build"
+  }
+}

@@ -1,0 +1,55 @@
+# Ignore Python bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore environment files
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Ignore database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore node modules
+node_modules/
+
+# Ignore logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore package-lock files
+package-lock.json
+
+# Ignore large data files
+data/raw_articles/*.json
+
+# Ignore parent directories
+../../*
+
+# Keep only the current project files
+!*.py
+!*.html
+!*.md
+!*.txt
+!*.json
+!requirements.txt
+!package.json
+!.gitignore
+!stockradar-ui/ 
