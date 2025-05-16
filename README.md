@@ -2,9 +2,6 @@
 
 StockRadar is an intelligent stock market analysis platform that combines portfolio management, machine learning-based stock recommendations, and real-time news impact analysis.
 
-## Live Demo
-
-[Add your deployed application URL here]
 
 ## Features
 
@@ -45,8 +42,8 @@ StockRadar is an intelligent stock market analysis platform that combines portfo
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/stockradar.git
-cd stockradar
+git clone https://github.com/chirumamilla1522/666.git
+cd 666
 ```
 
 2. Create and activate a virtual environment:
@@ -66,17 +63,10 @@ pip install -r requirements.txt
    Create a `.env` file in the root directory with:
 
 ```
-NEWSAPI_KEY=your_newsapi_key
 DATABASE_URL=sqlite:///./stockradar.db
 ```
 
-5. Initialize the database:
-
-```bash
-python -c "from app import Base, engine; Base.metadata.create_all(bind=engine)"
-```
-
-6. Start the FastAPI server:
+5. Start the FastAPI server:
 
 ```bash
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
