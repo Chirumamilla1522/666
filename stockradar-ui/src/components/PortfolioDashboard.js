@@ -1,437 +1,587 @@
 // src/components/PortfolioDashboard.js
-
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  CardHeader,
-  Typography,
-  TextField,
-  Autocomplete,
-  IconButton,
-  Skeleton,
-  Chip,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  useTheme,
-  MenuItem,
-  FormControlLabel,
-  Switch
+  Box, Grid, Card, CardContent, CardHeader, Typography,
+  TextField, IconButton, Chip, Button, Dialog, DialogTitle,
+  DialogContent, DialogActions, FormControl, InputLabel,
+  Select, MenuItem, Stack, useTheme, Skeleton, Autocomplete
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon,
-  Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon
+  Refresh as RefreshIcon,
+  ShowChart as ChartIcon
 } from '@mui/icons-material';
-import { Sparklines, SparklinesLine } from 'react-sparklines';
 import axios from 'axios';
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis,
+  Tooltip, CartesianGrid
+} from 'recharts';
 
 export default function PortfolioDashboard() {
   const theme = useTheme();
 
-  // Data state
+  // ─── State ──────────────────────────────────────────────────────────────────
   const [portfolio, setPortfolio] = useState(null);
-  const [topPerf, setTopPerf] = useState(null);
-  const [companies, setCompanies] = useState([]);
-
-  // UI state
-  const [filter, setFilter] = useState('');
+  const [quotes, setQuotes]       = useState([]);
+  const [stocks, setStocks]       = useState([]);     // master stock list
+  const [filter, setFilter]       = useState('');
   const [sortField, setSortField] = useState('ticker');
-  const [sortDir, setSortDir] = useState('asc');
-  const emptyForm = { id: '', ticker: '', quantity: '' };
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [darkMode, setDarkMode] = useState(false);
+  const [sortDir, setSortDir]     = useState('asc');
+  const [error, setError]         = useState(null);
 
-  // Fetch list of all stocks for the Autocomplete
+  // add/edit dialog
+  const [editOpen, setEditOpen]   = useState(false);
+  const [editing, setEditing]     = useState(null);   // if null → add mode
+  const [newTicker, setNewTicker] = useState(null);
+  const [newQty, setNewQty]       = useState('');
+
+  // detail chart
+  const [openChart, setOpenChart] = useState(false);
+  const [detail, setDetail]       = useState({
+    ticker: '', name: '', data: [], period: '1d'
+  });
+
+  // top performers
+  const [topPerf, setTopPerf]     = useState(null);
+  const [tpPeriod, setTpPeriod]   = useState('1d');
+
+  // ─── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    let isMounted = true;
-    
-    const fetchStocks = async () => {
-      try {
-        const res = await axios.get('/stocks');
-        if (isMounted) {
-          setCompanies(
-            res.data.map(o => ({
-              label: `${o.name} (${o.ticker})`,
-              ticker: o.ticker,
-              sector: o.sector
-            }))
-          );
-        }
-      } catch (error) {
-        console.error("Failed to fetch stocks", error);
-        if (isMounted) {
-          setCompanies([]);
-        }
-      }
-    };
-    
-    fetchStocks();
-    
-    return () => {
-      isMounted = false;
-    };
+    loadAll();
+    axios.get('/stocks')
+      .then(res => setStocks(res.data))
+      .catch(() => setStocks([]));
   }, []);
 
-  // Load portfolio and quotes
-  const loadPortfolio = async () => {
+  useEffect(() => {
+    loadTopPerf(tpPeriod);
+  }, [tpPeriod]);
+
+  // ─── Data Loading ─────────────────────────────────────────────────────────────
+  async function loadAll() {
+    setError(null);
     setPortfolio(null);
     try {
-      const [hRes, qRes] = await Promise.all([
+      const [pRes, qRes] = await Promise.all([
         axios.get('/portfolio'),
         axios.get('/quotes')
       ]);
-      setPortfolio(hRes.data.map(h => {
-        const q = qRes.data.find(x => x.ticker === h.ticker) || {};
-        return {
-          id: h.id,
-          ticker: h.ticker,
-          quantity: h.quantity,
-          name: q.name || h.ticker,
-          price: q.price || 0,
-          change: q.change || 0,
-          spark: q.spark || [],
-          sector: companies.find(c => c.ticker === h.ticker)?.sector || ''
-        };
-      }));
+      setPortfolio(pRes.data);
+      setQuotes(qRes.data);
     } catch {
+      setError('Failed to load portfolio');
       setPortfolio([]);
+      setQuotes([]);
     }
-  };
+    loadTopPerf(tpPeriod);
+  }
 
-  // Load top performers
-  const loadTopPerf = () => {
+  async function loadTopPerf(period) {
     setTopPerf(null);
-    axios.get('/top-performers')
-      .then(res => setTopPerf(res.data))
-      .catch(() => setTopPerf([]));
-  };
-
-  // Initial data fetch
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchData = async () => {
-      try {
-        await loadPortfolio();
-        if (isMounted) {
-          const res = await axios.get('/top-performers');
-          if (isMounted) {
-            setTopPerf(res.data);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading data", error);
-        if (isMounted) {
-          setPortfolio([]);
-          setTopPerf([]);
-        }
-      }
-    };
-    
-    fetchData();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [companies]);
-
-  const refreshAll = () => {
-    loadPortfolio();
-    loadTopPerf();
-  };
-
-  // Dialog handlers
-  const openForm = (h = emptyForm) => {
-    setForm({ ...emptyForm, ...h });
-    setOpen(true);
-  };
-  const closeForm = () => {
-    setOpen(false);
-    setForm(emptyForm);
-  };
-  const submitForm = async () => {
-    const payload = { ticker: form.ticker, quantity: +form.quantity };
     try {
-      if (form.id) {
-        await axios.put(`/portfolio/${form.id}`, payload);
-      } else {
-        await axios.post('/portfolio', payload);
-      }
-      closeForm();
-      refreshAll();
-    } catch (e) {
-      console.error(e);
-      alert(e.response?.data?.detail || 'Save failed');
+      const interval = period === '1d' ? '1m' : '60m';
+      const res = await axios.get(
+        `/top-performers?period=${period}&interval=${interval}`
+      );
+      setTopPerf(res.data);
+    } catch {
+      setTopPerf([]);
     }
-  };
-  const deleteHolding = async () => {
-    if (!form.id) return;
-    try {
-      await axios.delete(`/portfolio/${form.id}`);
-      closeForm();
-      refreshAll();
-    } catch (e) {
-      console.error(e);
-      alert('Delete failed');
-    }
-  };
+  }
 
-  // Filter & sort displayed holdings
-  const displayed = (portfolio || [])
-    .filter(q =>
-      q.ticker.includes(filter.toUpperCase()) ||
-      q.name.toLowerCase().includes(filter.toLowerCase())
-    )
-    .sort((a, b) => {
-      let cmp = 0;
-      if (['ticker', 'name', 'sector'].includes(sortField)) {
-        cmp = a[sortField].localeCompare(b[sortField]);
-      } else {
-        cmp = a[sortField] - b[sortField];
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
+  // ─── Merge portfolio + quotes ────────────────────────────────────────────────
+  function merged() {
+    if (!portfolio) return [];
+    return portfolio.map(h => {
+      const q     = quotes.find(x => x.ticker === h.ticker) || {};
+      const spark = Array.isArray(q.spark) ? q.spark : [];
+      const times = Array.isArray(q.spark_times) && q.spark_times.length === spark.length
+        ? q.spark_times
+        : spark.map((_, i) => Date.now() - (spark.length - i) * 60000);
+
+      return {
+        ...h,
+        name:   q.name    || h.ticker,
+        price:  q.price   || 0,
+        change: q.change  || 0,
+        spark,
+        times
+      };
     });
+  }
 
-  // Compute total portfolio sparkline
-  const totalSpark = useMemo(() => {
-    if (!portfolio || portfolio.length === 0) return [];
-    const minLen = Math.min(...portfolio.map(h => h.spark.length));
-    const data = [];
-    for (let i = 0; i < minLen; i++) {
-      let sum = 0;
-      portfolio.forEach(h => {
-        sum += (h.spark[i] || 0) * h.quantity;
+  // ─── Total value trend ───────────────────────────────────────────────────────
+  const totalSeries = useMemo(() => {
+    const m = merged();
+    if (!m.length) return [];
+    const L = Math.min(...m.map(x => x.spark.length));
+    return Array.from({ length: L }).map((_, i) => ({
+      time:  m[0].times[i],
+      value: parseFloat(
+        m.reduce((sum, s) => sum + (s.spark[i] || s.price) * s.quantity, 0)
+        .toFixed(2)
+      )
+    }));
+  }, [portfolio, quotes]);
+
+  // ─── Open small detail chart ─────────────────────────────────────────────────
+  async function handleOpenChart(ticker, name) {
+    const interval = detail.period === '1d' ? '1m' : '60m';
+    const res = await axios.get(
+      `/top-performers?period=${detail.period}&interval=${interval}`
+    );
+    const item  = res.data.find(p => p.ticker === ticker) || {};
+    const spark = Array.isArray(item.spark) ? item.spark : [];
+    const times = Array.isArray(item.spark_times) && item.spark_times.length === spark.length
+      ? item.spark_times
+      : spark.map((_, i) => Date.now() - (spark.length - i) * 60000);
+
+    setDetail({
+      ticker,
+      name,
+      data: spark.map((price,i) => ({ time: times[i], price })),
+      period: detail.period
+    });
+    setOpenChart(true);
+  }
+
+  function handleDetailPeriod(newP) {
+    setDetail(d => ({ ...d, period: newP }));
+    handleOpenChart(detail.ticker, detail.name);
+  }
+
+  // ─── Add holding ─────────────────────────────────────────────────────────────
+  async function handleAdd() {
+    if (!newTicker) return;
+    try {
+      await axios.post('/portfolio', {
+        ticker: newTicker.ticker,
+        quantity: parseFloat(newQty)
       });
-      data.push(parseFloat(sum.toFixed(2)));
+      setEditOpen(false);
+      setNewTicker(null);
+      setNewQty('');
+      loadAll();
+    } catch {
+      alert('Failed to add holding');
     }
-    return data;
-  }, [portfolio]);
+  }
 
-  return (
-    <Box
-      p={3}
-      bgcolor={darkMode ? '#121212' : '#fafafa'}
-      color={darkMode ? '#fff' : 'inherit'}
-    >
-      {/* Dark Mode Toggle */}
-      <FormControlLabel
-        control={
-          <Switch
-            checked={darkMode}
-            onChange={e => setDarkMode(e.target.checked)}
-          />
+  // ─── Start editing ───────────────────────────────────────────────────────────
+  function openEditDialog(h) {
+    setEditing(h);
+    setNewTicker({ ticker: h.ticker, name: h.name });
+    setNewQty(h.quantity.toString());
+    setEditOpen(true);
+  }
+
+  // ─── Submit edits ───────────────────────────────────────────────────────────
+  async function handleSubmitEdit() {
+    if (!editing) return;
+    try {
+      await axios.put(`/portfolio/${editing.id}`, {
+        ticker: editing.ticker,
+        quantity: parseFloat(newQty)
+      });
+      setEditOpen(false);
+      setEditing(null);
+      setNewTicker(null);
+      setNewQty('');
+      loadAll();
+    } catch {
+      alert('Failed to update holding');
+    }
+  }
+
+  // ─── Delete holding ─────────────────────────────────────────────────────────
+  async function handleDelete() {
+    if (!editing) return;
+    try {
+      await axios.delete(`/portfolio/${editing.id}`);
+      setEditOpen(false);
+      setEditing(null);
+      loadAll();
+    } catch {
+      alert('Failed to delete holding');
+    }
+  }
+
+  // ─── Filter & sort holdings ─────────────────────────────────────────────────
+  const displayed = useMemo(() => {
+    return merged()
+      .filter(h =>
+        h.ticker.includes(filter.toUpperCase()) ||
+        h.name.toLowerCase().includes(filter.toLowerCase())
+      )
+      .sort((a,b) => {
+        let cmp = 0;
+        if (['ticker','name'].includes(sortField)) {
+          cmp = a[sortField].localeCompare(b[sortField]);
+        } else {
+          cmp = (a[sortField]||0) - (b[sortField]||0);
         }
-        label="Dark Mode"
-      />
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+  }, [portfolio, quotes, filter, sortField, sortDir]);
 
-      {/* Summary Card */}
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: 3,
-          background: `linear-gradient(135deg, ${theme.palette.primary.main}55, ${theme.palette.secondary.main}55)`,
-          color: theme.palette.getContrastText(theme.palette.primary.main),
-          boxShadow: 4
-        }}
-      >
+  // ─── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <Box p={3}>
+      {error && <Typography color="error">{error}</Typography>}
+
+      {/* Portfolio Value */}
+      <Card sx={{ mb:3, background: theme.palette.grey[100] }}>
         <CardContent>
-          <Typography variant="h6">Portfolio Summary</Typography>
-          <Box display="flex" alignItems="center" mt={1} gap={4}>
-            <Box>
-              <Typography variant="subtitle2">Total Value</Typography>
-              <Typography variant="h4">
-                ${totalSpark.length
-                  ? totalSpark[totalSpark.length - 1].toFixed(2)
-                  : '0.00'}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2">Value Trend</Typography>
-              {totalSpark.length > 1 && (
-                <Sparklines data={totalSpark} width={200} height={50} margin={5}>
-                  <SparklinesLine
-                    style={{
-                      stroke: theme.palette.primary.dark,
-                      fill: theme.palette.primary.light,
-                      fillOpacity: 0.2
-                    }}
+          <Typography variant="h6">Portfolio Value</Typography>
+          <Typography variant="h4" gutterBottom>
+            ${ totalSeries.length
+               ? totalSeries[totalSeries.length-1].value.toFixed(2)
+               : '0.00' }
+          </Typography>
+          <Box height={80}>
+            {totalSeries.length > 1 && (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={totalSeries}>
+                  <XAxis
+                    dataKey="time"
+                    tickFormatter={t =>
+                      new Date(t).toLocaleTimeString([], {
+                        hour:'2-digit', minute:'2-digit'
+                      })
+                    }
+                    tick={{ fontSize: 10 }}
                   />
-                </Sparklines>
-              )}
-            </Box>
+                  <YAxis domain={['auto','auto']} hide/>
+                  <Tooltip
+                    labelFormatter={t => new Date(t).toLocaleString()}
+                    formatter={v => `$${v.toFixed(2)}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={theme.palette.primary.main}
+                    dot={false}
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </Box>
         </CardContent>
       </Card>
 
       {/* Controls */}
-      <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+      <Stack direction="row" spacing={2} mb={2} alignItems="center">
         <TextField
-          label="Search"
+          label="Search holdings"
           size="small"
           value={filter}
           onChange={e => setFilter(e.target.value)}
         />
-        <TextField
-          label="Sort by"
-          size="small"
-          select
-          value={sortField}
-          onChange={e => setSortField(e.target.value)}
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Sort by</InputLabel>
+          <Select
+            value={sortField}
+            label="Sort by"
+            onChange={e => setSortField(e.target.value)}
+          >
+            <MenuItem value="ticker">Ticker</MenuItem>
+            <MenuItem value="name">Name</MenuItem>
+            <MenuItem value="price">Price</MenuItem>
+            <MenuItem value="change">Change</MenuItem>
+          </Select>
+        </FormControl>
+        <IconButton
+          onClick={() => setSortDir(d => d==='asc'?'desc':'asc')}
         >
-          {['ticker', 'name', 'sector', 'quantity', 'price', 'change'].map(f => (
-            <MenuItem key={f} value={f}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <IconButton onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}>
           <RefreshIcon
-            sx={{ transform: sortDir === 'asc' ? 'rotate(0deg)' : 'rotate(180deg)' }}
+            sx={{
+              transform: sortDir==='asc'
+                ? 'rotate(0)' : 'rotate(180deg)'
+            }}
           />
         </IconButton>
+        <Button variant="outlined" onClick={loadAll}>Refresh</Button>
         <Button
           variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => openForm()}
+          onClick={() => {
+            setEditing(null);
+            setNewTicker(null);
+            setNewQty('');
+            setEditOpen(true);
+          }}
         >
           Add Holding
         </Button>
-        <IconButton onClick={refreshAll}>
-          <RefreshIcon />
-        </IconButton>
-      </Box>
+      </Stack>
 
-      {/* Portfolio Grid */}
+      {/* Holdings Grid */}
       <Grid container spacing={2}>
-        {displayed.length === 0 && portfolio !== null ? (
-          <Grid item xs={12}>
-            <Typography>No holdings.</Typography>
-          </Grid>
-        ) : (
-          displayed.map(q => (
-            <Grid item xs={12} sm={6} md={4} key={q.id}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  boxShadow: 2,
-                  '&:hover': { boxShadow: 6 }
-                }}
-              >
-                <CardHeader
-                  avatar={
-                    <IconButton size="small" onClick={() => openForm(q)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  }
-                  title={`${q.ticker} • ${q.name}`}
-                  subheader={q.sector}
-                  action={
-                    <Chip
-                      label={`${q.change >= 0 ? '+' : ''}${q.change.toFixed(2)}`}
-                      color={q.change >= 0 ? 'success' : 'error'}
-                      size="small"
-                    />
-                  }
-                />
-                <CardContent>
-                  <Box mb={1}>
+        {portfolio === null
+          ? Array.from({ length: 6 }).map((_,i)=>(
+              <Grid item xs={12} sm={6} md={4} key={i}>
+                <Skeleton variant="rectangular" height={200}/>
+              </Grid>
+            ))
+          : displayed.map(h=>(
+              <Grid item xs={12} sm={6} md={4} key={h.id}>
+                <Card sx={{ borderRadius:2, boxShadow:2 }}>
+                  <CardHeader
+                    avatar={
+                      <IconButton
+                        size="small"
+                        onClick={() => openEditDialog(h)}
+                      >
+                        <EditIcon/>
+                      </IconButton>
+                    }
+                    title={`${h.ticker} • ${h.name}`}
+                    action={
+                      <Chip
+                        label={`${h.change>=0?'+':''}${h.change.toFixed(2)}`}
+                        color={h.change>=0?'success':'error'}
+                        size="small"
+                      />
+                    }
+                  />
+                  <CardContent>
                     <Typography variant="h5">
-                      ${q.price.toFixed(2)}
+                      ${h.price.toFixed(2)}
                     </Typography>
-                    <Typography variant="subtitle2" color="textSecondary">
-                      Qty: {q.quantity}
-                    </Typography>
-                  </Box>
-                  <Sparklines data={q.spark} limit={30} width={120} height={40}>
-                    <SparklinesLine
-                      style={{
-                        stroke:
-                          q.change >= 0
-                            ? theme.palette.success.main
-                            : theme.palette.error.main,
-                        fill: 'none'
-                      }}
-                    />
-                  </Sparklines>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))
-        )}
+                    <Box height={120} mt={1}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={h.spark.map((p,i)=>({
+                            time: h.times[i],
+                            price: p
+                          }))}
+                        >
+                          <XAxis
+                            dataKey="time"
+                            tickFormatter={t=>
+                              new Date(t).toLocaleTimeString([],{
+                                hour:'2-digit', minute:'2-digit'
+                              })
+                            }
+                            tick={{ fontSize:10 }}
+                          />
+                          <YAxis domain={['auto','auto']} hide/>
+                          <Tooltip
+                            labelFormatter={t=>new Date(t).toLocaleTimeString()}
+                            formatter={v=>`$${v.toFixed(2)}`}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="price"
+                            stroke={h.change>=0
+                              ? theme.palette.success.main
+                              : theme.palette.error.main}
+                            dot={false}
+                            strokeWidth={2}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </Box>
+                    <Box display="flex" justifyContent="flex-end">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenChart(h.ticker,h.name)}
+                      >
+                        <ChartIcon/>
+                      </IconButton>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+        }
       </Grid>
 
       {/* Top Performers */}
-      <Box mt={4} mb={2} display="flex" justifyContent="space-between">
-        <Typography variant="h5">Today's Top Performers</Typography>
-        <IconButton onClick={refreshAll}>
-          <RefreshIcon />
-        </IconButton>
+      <Box mt={5} mb={2} display="flex" justifyContent="space-between">
+        <Typography variant="h5">Top Performers</Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <FormControl size="small" sx={{ minWidth:120 }}>
+            <InputLabel>Period</InputLabel>
+            <Select
+              value={tpPeriod}
+              label="Period"
+              onChange={e => setTpPeriod(e.target.value)}
+            >
+              <MenuItem value="1d">1 Day</MenuItem>
+              <MenuItem value="5d">5 Days</MenuItem>
+              <MenuItem value="1mo">1 Month</MenuItem>
+            </Select>
+          </FormControl>
+          <IconButton onClick={()=>loadTopPerf(tpPeriod)}>
+            <RefreshIcon/>
+          </IconButton>
+        </Stack>
       </Box>
       <Grid container spacing={2}>
-        {(topPerf || []).map(p => (
-          <Grid item xs={12} sm={6} md={4} key={p.ticker}>
-            <Card variant="outlined" sx={{ borderRadius: 3, boxShadow: 1 }}>
-              <CardContent sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="subtitle1">{p.ticker}</Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {p.name}
-                  </Typography>
-                </Box>
-                <Chip
-                  label={`${p.change_percent >= 0 ? '+' : ''}${p.change_percent}%`}
-                  color={p.change_percent >= 0 ? 'success' : 'error'}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
+        {topPerf===null
+          ? Array.from({length:3}).map((_,i)=>(
+              <Grid item xs={12} sm={6} md={4} key={i}>
+                <Skeleton variant="rectangular" height={160}/>
+              </Grid>
+            ))
+          : topPerf.map(p=>{
+              const spark = Array.isArray(p.spark)?p.spark:[];
+              const times = Array.isArray(p.spark_times) && p.spark_times.length===spark.length
+                ? p.spark_times
+                : spark.map((_,i)=>Date.now() - (spark.length-i)*60000);
+              const data = spark.map((price,i)=>({
+                time: times[i], price
+              }));
+              return (
+                <Grid item xs={12} sm={6} md={4} key={p.ticker}>
+                  <Card variant="outlined" sx={{ borderRadius:2, boxShadow:1 }}>
+                    <CardHeader
+                      title={p.ticker}
+                      subheader={p.name}
+                      action={
+                        <Chip
+                          label={`${p.change_percent>=0?'+':''}${p.change_percent.toFixed(2)}%`}
+                          color={p.change_percent>=0?'success':'error'}
+                          size="small"
+                        />
+                      }
+                    />
+                    <CardContent>
+                      <Box height={100}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={data}>
+                            <XAxis
+                              dataKey="time"
+                              tickFormatter={t=>
+                                new Date(t).toLocaleTimeString([],{
+                                  hour:'2-digit', minute:'2-digit'
+                                })
+                              }
+                              tick={{ fontSize:10 }}
+                            />
+                            <YAxis domain={['auto','auto']} hide/>
+                            <Tooltip
+                              labelFormatter={t=>new Date(t).toLocaleTimeString()}
+                              formatter={v=>`$${v.toFixed(2)}`}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="price"
+                              stroke={p.change_percent>=0
+                                ? theme.palette.success.main
+                                : theme.palette.error.main}
+                              dot={false}
+                              strokeWidth={2}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })
+        }
       </Grid>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={open} onClose={closeForm}>
-        <DialogTitle>{form.id ? 'Edit' : 'Add'} Holding</DialogTitle>
+      {/* Detail Chart Dialog */}
+      <Dialog open={openChart} onClose={()=>setOpenChart(false)} maxWidth="lg" fullWidth>
+        <DialogTitle>
+          {detail.ticker} • {detail.name}
+          <FormControl sx={{ ml:4, minWidth:120 }} size="small">
+            <InputLabel>Period</InputLabel>
+            <Select
+              value={detail.period}
+              onChange={e=>handleDetailPeriod(e.target.value)}
+              label="Period"
+            >
+              <MenuItem value="1d">1 Day</MenuItem>
+              <MenuItem value="5d">5 Days</MenuItem>
+              <MenuItem value="1mo">1 Month</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogTitle>
         <DialogContent>
+          <Box height={400}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={detail.data}>
+                <CartesianGrid strokeDasharray="3 3"/>
+                <XAxis
+                  dataKey="time"
+                  tickFormatter={t=>
+                    new Date(t).toLocaleTimeString([],{
+                      hour:'2-digit', minute:'2-digit'
+                    })
+                  }
+                />
+                <YAxis domain={['auto','auto']}/>
+                <Tooltip
+                  labelFormatter={t=>new Date(t).toLocaleString()}
+                  formatter={v=>`$${v.toFixed(2)}`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke={theme.palette.primary.main}
+                  dot={false}
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={()=>setOpenChart(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={editOpen} onClose={()=>setEditOpen(false)}>
+        <DialogTitle>
+          {editing ? 'Edit Holding' : 'Add New Holding'}
+        </DialogTitle>
+        <DialogContent sx={{ pt:1, pb:2 }}>
           <Autocomplete
-            options={companies}
-            getOptionLabel={o => o.label}
-            value={companies.find(o => o.ticker === form.ticker) || null}
-            onChange={(_, opt) => setForm(f => ({ ...f, ticker: opt ? opt.ticker : '' }))}
-            renderInput={params => (
-              <TextField {...params} margin="dense" label="Company" fullWidth />
+            options={stocks}
+            getOptionLabel={opt => `${opt.ticker} — ${opt.name}`}
+            value={ editing ? { ticker: editing.ticker, name: editing.name } : newTicker }
+            onChange={(_, v) => setNewTicker(v)}
+            disabled={!!editing}
+            isOptionEqualToValue={(opt, val) => opt.ticker === val.ticker}
+            renderInput={params=>(
+              <TextField
+                {...params}
+                label="Ticker / Company"
+                margin="dense"
+                fullWidth
+              />
             )}
-            sx={{ mb: 2 }}
           />
           <TextField
             margin="dense"
             label="Quantity"
             type="number"
+            value={newQty}
+            onChange={e=>setNewQty(e.target.value)}
             fullWidth
-            value={form.quantity}
-            onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
           />
         </DialogContent>
         <DialogActions>
-          {form.id && (
-            <IconButton color="error" onClick={deleteHolding}>
-              <DeleteIcon />
-            </IconButton>
+          {editing && (
+            <Button color="error" onClick={handleDelete}>
+              Delete
+            </Button>
           )}
-          <Button onClick={closeForm}>Cancel</Button>
+          <Button onClick={()=>setEditOpen(false)}>Cancel</Button>
           <Button
-            onClick={submitForm}
-            variant="contained"
-            disabled={!form.ticker || !form.quantity}
+            onClick={editing ? handleSubmitEdit : handleAdd}
+            disabled={
+              (!editing && (!newTicker || !newQty)) ||
+              (editing && !newQty)
+            }
           >
-            {form.id ? 'Update' : 'Add'}
+            {editing ? 'Save' : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>

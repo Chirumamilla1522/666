@@ -1,0 +1,2 @@
+Fortinet, Inc. is an American cybersecurity company with headquarters in Sunnyvale, California. The company develops and sells security solutions like firewalls, endpoint security and intrusion detection systems. Fortinet has offices located all over the world.
+Brothers Ken Xie and Michael Xie founded Fortinet in 2000. The company's first and main product was FortiGate, a physical firewall. The company later added wireless access points, sandbox and messaging security. The company went public in November 2009.

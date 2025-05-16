@@ -1,0 +1,3 @@
+Microchip Technology Incorporated is a publicly listed American semiconductor corporation that manufactures microcontroller, mixed-signal, analog, and Flash-IP integrated circuits.
+Its corporate headquarters is located in Chandler, Arizona. Its wafer fabs are located in Gresham, Oregon, and Colorado Springs, Colorado. The company's assembly/test facilities are in Chachoengsao, Thailand, and Calamba and Cabuyao, Philippines.
+Microchip Technology offers support and resources to educators, researchers and students in an effort to increase awareness and knowledge of embedded applications.

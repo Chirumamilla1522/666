@@ -1,21 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, createContext, useMemo } from 'react';
 import { ThemeProvider, createTheme, GlobalStyles } from '@mui/material';
 import DashboardLayout from './DashboardLayout';
 import PortfolioDashboard from './components/PortfolioDashboard';
 import RecsTab from './components/RecsTab';
 import NewsTab from './components/NewsTab';
 
+export const ThemeContext = createContext();
 
 export default function App() {
   const [tab, setTab] = useState(0);
   const [dark, setDark] = useState(false);
 
-  const theme = createTheme({
+  const theme = useMemo(() => createTheme({
     palette: {
       mode: dark ? 'dark' : 'light',
-      // 1️⃣ Use solid colors here
       primary: {
-        main: dark ? '#203a43' : '#4ca2cd',  // pick a representative shade
+        main: dark ? '#203a43' : '#4ca2cd',
         contrastText: '#fff'
       },
       secondary: {
@@ -24,7 +24,7 @@ export default function App() {
       },
       background: {
         default: dark ? '#121212' : '#f0f2f5',
-        paper:   dark ? '#1e1e1e' : '#ffffff',
+        paper: dark ? '#1e1e1e' : '#ffffff',
       },
       text: {
         primary: dark ? '#e0e0e0' : '#212121',
@@ -43,7 +43,6 @@ export default function App() {
       MuiAppBar: {
         styleOverrides: {
           root: {
-            // 2️⃣ Move your gradient here—this is valid CSS
             background: dark
               ? 'linear-gradient(90deg, #0f2027, #203a43, #2c5364)'
               : 'linear-gradient(90deg, #67b26f, #4ca2cd)',
@@ -62,10 +61,10 @@ export default function App() {
         }
       }
     }
-  });
+  }), [dark]);
 
   const renderTab = () => {
-    switch(tab) {
+    switch (tab) {
       case 0:
         return <PortfolioDashboard />;
       case 1:
@@ -78,24 +77,25 @@ export default function App() {
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <GlobalStyles styles={{
-        body: {
-          margin: 0,
-          padding: 0,
-          fontFamily: `"Inter", sans-serif`,
-          backgroundColor: theme.palette.background.default,
-        }
-      }} />
-
-      <DashboardLayout
-        currentTab={tab}
-        onTabChange={setTab}
-        darkMode={dark}
-        toggleDark={() => setDark(!dark)}
-      >
-        {renderTab()}
-      </DashboardLayout>
-    </ThemeProvider>
+    <ThemeContext.Provider value={{ dark, toggleDark: () => setDark(!dark) }}>
+      <ThemeProvider theme={theme}>
+        <GlobalStyles styles={{
+          body: {
+            margin: 0,
+            padding: 0,
+            fontFamily: `"Inter", sans-serif`,
+            backgroundColor: theme.palette.background.default,
+          }
+        }} />
+        <DashboardLayout
+          currentTab={tab}
+          onTabChange={setTab}
+          darkMode={dark}
+          toggleDark={() => setDark(!dark)}
+        >
+          {renderTab()}
+        </DashboardLayout>
+      </ThemeProvider>
+    </ThemeContext.Provider>
   );
 }
